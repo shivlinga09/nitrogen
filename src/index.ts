@@ -12,11 +12,11 @@ const prisma = new PrismaClient();
 
 await prisma.customer.createMany({
   data: [
-    { id: '1', name: 'Alice',
+    { name: 'Alice',
       email: 'alice@gmail.com',
       phoneNumber: '1234567890',
       address: '123 Main St, New York, NY 10001' },
-    { id: '2', name: 'Bob',
+    { name: 'Bob',
       email: 'bob@gmail.com',
       phoneNumber: '1234567891',
       address: '124 Main St, New York, NY 10001' },
@@ -41,7 +41,7 @@ app.get('/customers/:id', async (c) => {
 app.get('/customers/:id/orders', async (c) => {
   const id = c.req.param('id');
   const orders = await prisma.order.findMany({
-    where: { customerId: id },
+    where: { customerId: Number(id) },
     include: { orderItems: true },
   });
   return c.json(orders);
