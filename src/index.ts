@@ -1,172 +1,156 @@
-import { Hono } from "hono";
-import { PrismaClient } from "@prisma/client";
-import { serve } from "@hono/node-server";
+import { serve } from '@hono/node-server'
+import { Hono } from 'hono'
+import { PrismaClient } from '@prisma/client'
 
+const app = new Hono()
 
-const app = new Hono();
+app.get('/', (c) => {
+  return c.text('Hello Hono!')
+})
+
 const prisma = new PrismaClient();
 
+await prisma.customer.createMany({
+  data: [
+    { name: 'Alice',
+      email: 'alice@gmail.com',
+      phoneNumber: '1234567890',
+      address: '123 Main St, New York, NY 10001' },
+    { name: 'Bob',
+      email: 'bob@gmail.com',
+      phoneNumber: '1234567891',
+      address: '124 Main St, New York, NY 10001' },
+  ]});
 
-
-
-
-// ---------------------- Customers ----------------------
-
-// Register a new customer
-app.post("/customers", async (c) => {
-  const { id, name, email, phoneNumber, address } = await c.req.json(); // Expect `id` in request
+app.post('/customers', async (c) => {
+  const { name, email, phoneNumber, address } = await c.req.json();
   const customer = await prisma.customer.create({
-    data: { id, name, email, phoaddressneNumber,  },
+    data: { name, email, phoneNumber, address },
   });
   return c.json(customer);
 });
 
-
-// Retrieve details of a customer
-app.get("/customers/:id", async (c) => {
-  const id = c.req.param("id");
-  const customer = await prisma.customer.findUnique({ where: { id } });
-  return customer ? c.json(customer) : c.notFound();
+app.get('/customers/:id', async (c) => {
+  const id = c.req.param('id');
+  const customer = await prisma.customer.findUnique({
+    where: { id: Number(id) },
+  });
+  return c.json(customer);
 });
 
-// Retrieve all orders placed by a customer
-app.get("/customers/:id/orders", async (c) => {
-  const id = c.req.param("id");
+app.get('/customers/:id/orders', async (c) => {
+  const id = c.req.param('id');
   const orders = await prisma.order.findMany({
-    where: { customerId: id },
-    include: { orderItems: { include: { menuItem: true } } },
+    where: { customerId: Number(id) },
+    include: { orderItems: true },
   });
   return c.json(orders);
 });
 
-// ---------------------- Restaurants ----------------------
-
-// Register a new restaurant
-app.post("/restaurants", async (c) => {
-  const {id, name, location } = await c.req.json();
+app.post('/restaurants', async (c) => {
+  const { name, location } = await c.req.json();
   const restaurant = await prisma.restaurant.create({
-    data: {id, name, location },
+    data: { name, location },
   });
   return c.json(restaurant);
 });
 
-// Get all available menu items from a restaurant
-app.get("/restaurants/:id/menu", async (c) => {
-  const id = c.req.param("id");
+app.get('/restaurants/:id/menu', async (c) => {
+  const id = c.req.param('id');
   const menuItems = await prisma.menuItem.findMany({
-    where: { restaurantId: id, isAvailable: true },
+    where: { restaurantId: Number(id), isAvailable: true },
   });
   return c.json(menuItems);
 });
 
-// ---------------------- Menu Items ----------------------
-
-// Add a menu item to a restaurant
-app.post("/restaurants/:id/menu", async (c) => {
-  const restaurantId = c.req.param("id");
-  const { id, name, price, isAvailable } = await c.req.json();
+app.post('/restaurants/:id/menu', async (c) => {
+  const id = c.req.param('id');
+  const { name, price } = await c.req.json();
   const menuItem = await prisma.menuItem.create({
-    data: { id, restaurantId, name, price, isAvailable },
+    data: { name, price, restaurantId: Number(id) },
   });
   return c.json(menuItem);
 });
 
-// Update availability or price of a menu item
-app.patch("/menu/:id", async (c) => {
-  const id = c.req.param("id");
-  const { price, isAvailable } = await c.req.json();
+app.patch('/menu/:id', async (c) => {
+  const id = c.req.param('id');
+  const { isAvailable, price } = await c.req.json();
   const menuItem = await prisma.menuItem.update({
-    where: { id },
-    data: { price, isAvailable },
+    where: { id: Number(id) },
+    data: { isAvailable, price },
   });
   return c.json(menuItem);
 });
 
-// ---------------------- Orders ----------------------
-
-// Place an order (includes items and quantities)
-app.post("/orders", async (c) => {
-  const {id, customerId, restaurantId, items } = await c.req.json();
-
-  const totalPrice = await items.reduce(async (sumPromise: any, item: any) => {
-    const sum = await sumPromise;
-    const menuItem = await prisma.menuItem.findUnique({ where: { id: item.menuItemId } });
-    return sum + (menuItem ? menuItem.price.toNumber() * item.quantity : 0);
-  }, Promise.resolve(0));
-
+app.post('/orders', async (c) => {
+  const { customerId, restaurantId, items } = await c.req.json();
   const order = await prisma.order.create({
     data: {
-      id,
       customerId,
       restaurantId,
-      totalPrice,
-      orderItems: { create: items.map((item: any) => ({ menuItemId: item.menuItemId, quantity: item.quantity })) },
+      totalPrice: items.reduce((sum: number, item: { price: number; quantity: number }) => sum + item.price * item.quantity, 0),
+      orderItems: {
+        create: items.map((item: { menuItemId: number; quantity: number }) => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+        })),
+      },
     },
-    include: { orderItems: true },
   });
-
   return c.json(order);
 });
 
-// Retrieve details of a specific order
-app.get("/orders/:id", async (c) => {
-  const id = c.req.param("id");
+app.get('/orders/:id', async (c) => {
+  const id = c.req.param('id');
   const order = await prisma.order.findUnique({
-    where: { id },
-    include: { orderItems: { include: { menuItem: true } } },
+    where: { id: Number(id) },
+    include: { orderItems: true },
   });
-  return order ? c.json(order) : c.notFound();
+  return c.json(order);
 });
 
-// Update the status of an order
-app.patch("/orders/:id/status", async (c) => {
-  const id = c.req.param("id");
+app.patch('/orders/:id/status', async (c) => {
+  const id = c.req.param('id');
   const { status } = await c.req.json();
   const order = await prisma.order.update({
-    where: { id },
+    where: { id: Number(id) },
     data: { status },
   });
   return c.json(order);
 });
 
-// ---------------------- Reports & Insights ----------------------
-
-// Get total revenue generated by a restaurant
-app.get("/restaurants/:id/revenue", async (c) => {
-  const id = c.req.param("id");
+app.get('/restaurants/:id/revenue', async (c) => {
+  const id = c.req.param('id');
   const revenue = await prisma.order.aggregate({
-    where: { restaurantId: id },
+    where: { restaurantId: Number(id) },
     _sum: { totalPrice: true },
   });
-  return c.json({ revenue: revenue._sum.totalPrice || 0 });
+  return c.json(revenue._sum.totalPrice);
 });
 
-// Retrieve the most ordered menu item across all restaurants
-app.get("/menu/top-items", async (c) => {
+app.get('/menu/top-items', async (c) => {
   const topItems = await prisma.orderItem.groupBy({
-    by: ["menuItemId"],
+    by: ['menuItemId'],
     _sum: { quantity: true },
-    orderBy: { _sum: { quantity: "desc" } },
+    orderBy: { _sum: { quantity: 'desc' } },
     take: 1,
   });
-
-  if (topItems.length === 0) return c.json({ message: "No orders found" });
-
-  const menuItem = await prisma.menuItem.findUnique({ where: { id: topItems[0].menuItemId } });
-  return c.json({ menuItem, totalOrders: topItems[0]._sum.quantity });
+  return c.json(topItems);
 });
 
-// Get the top 5 customers based on the number of orders placed
-app.get("/customers/top", async (c) => {
+app.get('/customers/top', async (c) => {
   const topCustomers = await prisma.customer.findMany({
+    orderBy: { orders: { _count: 'desc' } },
     take: 5,
-    orderBy: { orders: { _count: "desc" } },
-    include: { orders: true },
   });
   return c.json(topCustomers);
 });
 
-// ---------------------- Server Setup ----------------------
 
-serve({ fetch: app.fetch, port: 3000 })
-console.log('Server is running on http://localhost:3000')
+ 
+serve({
+  fetch: app.fetch,
+  port: 3000
+}, (info) => {
+  console.log(`Server is running on http://localhost:${info.port}`)
+})

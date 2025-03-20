@@ -1,3 +1,9 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,60 +13,51 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
 model Customer {
-  id          String    @id
-  name        String
-  email       String    @unique
-  phoneNumber String    @unique
-  address     String
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(255)
+  email       String   @unique @db.VarChar(255)
+  phoneNumber String   @unique @db.VarChar(20)
+  address     String   @db.VarChar(255)
   orders      Order[]
 }
 
 model Restaurant {
-  id        String     @id
-  name      String     @unique
-  location  String
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(255)
+  location  String   @db.VarChar(255)
   menuItems MenuItem[]
   orders    Order[]
 }
 
 model MenuItem {
-  id           String     @id
-  restaurantId String
-  name         String
-  price        Decimal
-  isAvailable  Boolean @default(true)
-
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
-  orderItems   OrderItem[]
+  id            Int      @id @default(autoincrement())
+  restaurantId  Int
+  name          String   @db.VarChar(255)
+  price         Decimal  @db.Decimal(10, 2)
+  isAvailable   Boolean  @default(true)
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  orderItems    OrderItem[]
 }
 
 model Order {
-  id           String      @id  
-  customerId   String
-  restaurantId String
-  status       Status    @default(Placed)
-  totalPrice   Decimal
-  orderTime    DateTime  @default(now())
-
+  id           Int       @id @default(autoincrement())
+  customerId   Int
+  restaurantId Int
+  status       String    @default("Placed") @db.VarChar(50)
+  totalPrice   Decimal    @db.Decimal(10, 2)
+  orderTime    DateTime   @default(now())
   customer     Customer   @relation(fields: [customerId], references: [id])
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   orderItems   OrderItem[]
 }
 
 model OrderItem {
-  id         String  @id
-  orderId    String
-  menuItemId String
+  id         Int     @id @default(autoincrement())
+  orderId    Int
+  menuItemId Int
   quantity   Int
-
-  order      Order    @relation(fields: [orderId], references: [id])
+  order      Order   @relation(fields: [orderId], references: [id])
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
-}
-
-enum Status {
-  Placed
-  Preparing
-  Completed
-  Cancelled
 }
